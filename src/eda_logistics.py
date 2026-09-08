@@ -51,6 +51,13 @@ def main() -> None:
     plt.tight_layout()
     plt.show()
 
+    plt.scatter(df["distance_miles"], df["demand_units"])
+    plt.xlabel("Distance (miles)")
+    plt.ylabel("Shipment Volume (demand units)")
+    plt.title("Distance vs Shipment Volume")
+    plt.tight_layout()
+    plt.show()
+
     df[numeric_columns].hist(figsize=(10, 7))
     plt.tight_layout()
     plt.show()
