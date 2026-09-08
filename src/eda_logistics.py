@@ -29,8 +29,28 @@ def main() -> None:
     print("\nNumeric columns:")
     print(list(numeric_columns))
 
+    # Use project column names: demand_units is the shipment-volume proxy,
+    # and shipping_cost_usd is the available monetary measure.
+    mode_summary = df.groupby("transportation_mode")["demand_units"].mean()
+    print("\nAverage shipment volume by transportation mode:")
+    print(mode_summary)
+
+    correlation_columns = [
+        "distance_miles",
+        "demand_units",
+        "shipping_cost_usd",
+    ]
+    correlation = df[correlation_columns].corr()
+    print("\nCorrelation between logistics variables:")
+    print(correlation)
+
     # Keep plotting available for interactive EDA without forcing a display.
     sns.set_theme(style="whitegrid")
+    sns.heatmap(correlation, annot=True, cmap="Blues", vmin=-1, vmax=1)
+    plt.title("Correlation Between Logistics Variables")
+    plt.tight_layout()
+    plt.show()
+
     df[numeric_columns].hist(figsize=(10, 7))
     plt.tight_layout()
     plt.show()
