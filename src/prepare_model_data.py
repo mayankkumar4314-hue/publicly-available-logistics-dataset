@@ -16,11 +16,16 @@ def load_model_data(path: Path = DATA_FILE) -> tuple[pd.DataFrame, pd.Series]:
         "distance_miles",
         "demand_units",
         "inventory_before",
+        "transportation_mode",
     ]
     target = "shipping_cost_usd"
 
     model_data = df[features + [target]].dropna()
-    X = model_data[features]
+    X = pd.get_dummies(
+        model_data[features],
+        columns=["transportation_mode"],
+        drop_first=True,
+    )
     y = model_data[target]
     return X, y
 
