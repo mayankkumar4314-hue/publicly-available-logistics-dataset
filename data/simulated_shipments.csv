@@ -1,0 +1,13 @@
+shipment_id,origin,destination,transportation_mode,ship_date,promised_date,delivery_date,distance_miles,shipping_cost_usd,inventory_before,demand_units,delay_status
+SIM-0001,"Chicago, IL","Detroit, MI",Truck,2025-01-03,2025-01-05,2025-01-05,283,640,420,80,On time
+SIM-0002,"Dallas, TX","Atlanta, GA",Truck,2025-01-04,2025-01-07,2025-01-08,781,1210,260,95,Delayed
+SIM-0003,"Seattle, WA","Portland, OR",Rail,2025-01-05,2025-01-09,2025-01-09,174,510,680,120,On time
+SIM-0004,"Newark, NJ","Boston, MA",Truck,2025-01-06,2025-01-07,2025-01-07,217,430,310,60,On time
+SIM-0005,"Los Angeles, CA","Phoenix, AZ",Truck,2025-01-07,2025-01-09,2025-01-10,372,720,190,75,Delayed
+SIM-0006,"Memphis, TN","Nashville, TN",Air,2025-01-08,2025-01-09,2025-01-09,210,980,520,100,On time
+SIM-0007,"Miami, FL","Orlando, FL",Truck,2025-01-09,2025-01-10,2025-01-10,236,460,245,55,On time
+SIM-0008,"Denver, CO","Salt Lake City, UT",Rail,2025-01-10,2025-01-13,2025-01-14,505,760,360,90,Delayed
+SIM-0009,"Houston, TX","New Orleans, LA",Water,2025-01-11,2025-01-14,2025-01-13,348,390,800,140,On time
+SIM-0010,"Columbus, OH","Pittsburgh, PA",Truck,2025-01-12,2025-01-14,2025-01-14,185,405,275,70,On time
+SIM-0011,"Minneapolis, MN","Milwaukee, WI",Truck,2025-01-13,2025-01-15,2025-01-16,337,590,230,85,Delayed
+SIM-0012,"San Jose, CA","Las Vegas, NV",Air,2025-01-14,2025-01-16,2025-01-16,386,1340,150,65,On time
