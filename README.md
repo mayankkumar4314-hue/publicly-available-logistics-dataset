@@ -200,6 +200,148 @@ Used carefully, these methods can help logistics organizations:
 
 The expected benefit depends on data quality and implementation. FAF6 is valuable for strategic and regional planning, while operational decisions should be checked against current company data. Forecasts should be measured against later observations, clusters should be interpreted rather than accepted blindly, and optimization outputs should be tested for practical feasibility.
 
+## End-to-end Python process flow
+
+The complete process for this logistics scenario is:
+
+**Data Collection -> Data Cleaning -> Data Preprocessing -> EDA -> Feature Engineering -> Model Development -> Model Evaluation -> Prediction -> Logistics Decision-Making**
+
+The steps below show how the public FAF6 data and operational shipment data can be used together.
+
+### 1. Data collection
+
+The main public source is FAF6 from BTS, with supporting development by FHWA and ORNL. A selected FAF6 extract can contain an origin region, destination region, commodity, transportation mode, year, distance or distance band, shipment weight in tons, shipment value, and ton-miles. These fields describe freight demand and movement between regions. FAF6 is useful for strategic planning, but it is not a live tracking system.
+
+For a real company project, the public data would be combined with internal records. GPS devices and carrier APIs could provide location and travel events. A warehouse management system could provide picking, packing, inventory, and barcode scans. ERP and customer-order systems could provide demand, product, and value information. A transportation management system could provide carrier, route, mode, planned cost, and capacity. Delivery records could provide promised dates, actual delivery dates, and delay reasons. A common shipment, order, route, or region identifier would be needed when integrating these sources.
+
+Python can load and inspect the data with Pandas and NumPy:
+
+```python
+import numpy as np
+import pandas as pd
+
+flows = pd.read_csv("faf6_flows.csv")
+shipments = pd.read_csv("data/simulated_shipments.csv", parse_dates=[
+	"ship_date", "promised_date", "delivery_date"
+])
+print(flows.shape)
+print(flows.head())
+```
+
+### 2. Data cleaning and preprocessing
+
+Before analysis, the analyst should check the structure and quality of each file. Missing values can be reported and then removed, filled, or marked as unknown depending on their meaning. A suppressed FAF6 cell should not automatically be changed to zero. Duplicate records should be investigated using the expected key, such as year plus origin, destination, commodity, and mode. Text values such as `Truck`, `truck`, and `TRUCK` should be standardized. Dates and numeric columns should be converted from text to the correct data types.
+
+```python
+flows.columns = flows.columns.str.strip().str.lower()
+print(flows.isna().sum())
+print(flows.duplicated().sum())
+
+flows["mode"] = flows["mode"].str.strip().str.lower()
+flows["tons"] = pd.to_numeric(flows["tons"], errors="coerce")
+flows["year"] = pd.to_datetime(flows["year"].astype(str), format="%Y")
+flows = flows.drop_duplicates()
+flows = flows.dropna(subset=["origin", "destination", "mode", "tons"])
+```
+
+Outliers can be reviewed with a box plot or the interquartile range (IQR). For a numeric column, values below $Q1 - 1.5(IQR)$ or above $Q3 + 1.5(IQR)$ can be flagged. They should be checked against the source because an unusually large freight flow may be real. Categorical variables such as mode and commodity can be one-hot encoded. Numeric variables can be standardized when the selected model is sensitive to scale. Date columns can be converted into year, month, day of week, quarter, or a seasonal indicator.
+
+```python
+flows["month"] = flows["year"].dt.month
+flows["quarter"] = flows["year"].dt.quarter
+
+q1 = flows["tons"].quantile(0.25)
+q3 = flows["tons"].quantile(0.75)
+iqr = q3 - q1
+outlier_mask = (flows["tons"] < q1 - 1.5 * iqr) | (flows["tons"] > q3 + 1.5 * iqr)
+print(flows.loc[outlier_mask, ["origin", "destination", "tons"]])
+```
+
+### 3. Exploratory data analysis
+
+EDA helps explain the cleaned freight data before a model is selected. The analyst can calculate average, minimum, maximum, and total tons; compare transportation modes; rank origin-destination routes; examine freight value; and map or tabulate geographical patterns. Histograms show the distribution of tons or distance. Bar charts compare mode totals. Scatter plots show relationships such as distance and value. Box plots compare freight volume by mode, and a correlation heatmap shows relationships among numeric variables.
+
+```python
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+print(flows[["tons", "shipment_value", "distance_miles"]].describe())
+print(flows.groupby("mode")["tons"].sum().sort_values(ascending=False))
+
+sns.histplot(data=flows, x="tons", bins=30)
+plt.title("Freight volume distribution")
+plt.show()
+
+sns.scatterplot(data=flows, x="distance_miles", y="tons", hue="mode")
+plt.show()
+```
+
+EDA may show high-volume routes that need reliable capacity, modes that carry most freight, long-distance corridors, unusually high-value shipments, or seasonal changes. These findings guide feature selection and help identify whether a later prediction is reasonable. With aggregated FAF6 data, the analyst should avoid interpreting a regional pattern as the behavior of every individual shipment.
+
+### 4. Feature engineering
+
+Features should represent factors that can influence demand, cost, or delivery performance. Useful examples include total shipment volume per route, average route distance, transportation mode, freight value per ton, month, quarter, seasonal indicator, and historical shipment volume. A route's previous-period volume can be especially useful for forecasting demand. Distance and mode can influence cost and transit time, while commodity and value can influence handling requirements and mode choice.
+
+```python
+flows["value_per_ton"] = flows["shipment_value"] / flows["tons"].replace(0, np.nan)
+route_totals = flows.groupby(["origin", "destination"])["tons"].transform("sum")
+flows["route_volume"] = route_totals
+flows["is_peak_season"] = flows["month"].isin([10, 11, 12]).astype(int)
+```
+
+The feature definitions should be calculated using only information available at prediction time. For example, using the final actual delivery date to predict whether that same shipment was late would be data leakage.
+
+### 5. Predictive modeling
+
+One practical prediction problem is forecasting freight demand in tons for an origin-destination route and future period. Another is estimating transportation cost or identifying a likely delivery delay when shipment-level operational data is available. For a numeric target such as tons or cost, Linear Regression gives a simple baseline, while Random Forest or Gradient Boosting can capture non-linear relationships. A tree-based model is useful when distance, value, mode, and commodity interact in ways that are not well represented by a straight line.
+
+The data should be split into training and testing sets. For time-based forecasting, a chronological split is safer than randomly mixing past and future records. Categorical columns can be encoded inside a Scikit-learn pipeline.
+
+```python
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from sklearn.model_selection import train_test_split
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import OneHotEncoder
+
+features = ["distance_miles", "shipment_value", "commodity", "mode"]
+X = flows[features]
+y = flows["tons"]
+categorical = ["commodity", "mode"]
+numeric = ["distance_miles", "shipment_value"]
+preprocess = ColumnTransformer([
+	("categorical", OneHotEncoder(handle_unknown="ignore"), categorical),
+	("numeric", "passthrough", numeric),
+])
+model = make_pipeline(
+	preprocess, RandomForestRegressor(n_estimators=200, random_state=42)
+)
+X_train, X_test, y_train, y_test = train_test_split(
+	X, y, test_size=0.2, random_state=42
+)
+model.fit(X_train, y_train)
+prediction = model.predict(X_test)
+```
+
+### 6. Model evaluation and improvement
+
+The predictions should be compared with the actual test values. **MAE** shows the average size of an error in tons or dollars. **RMSE** gives more weight to large errors. **R²** summarizes the share of variation explained by the model, although it should not be used alone. A model that performs well on training data but poorly on test data may be overfitting. Poor performance on both sets may indicate underfitting, weak features, or noisy data.
+
+```python
+print("MAE:", mean_absolute_error(y_test, prediction))
+print("RMSE:", mean_squared_error(y_test, prediction) ** 0.5)
+print("R2:", r2_score(y_test, prediction))
+```
+
+Cross-validation can compare models more reliably, while grid search or randomized search can tune tree depth, number of trees, and minimum leaf size. For a demand forecast, time-series cross-validation is preferable to random folds. Accuracy may improve when the project adds more years, reliable route distances, fuel prices, carrier rates, weather, holidays, inventory levels, and actual delivery outcomes. The small simulated file in this repository is for demonstration and is not large enough for a dependable production model.
+
+### 7. Prediction and logistics decision-making
+
+After evaluation, the model can predict demand for a future route and period. A logistics manager can use that result to reserve truck, rail, or warehouse capacity; plan inventory before a seasonal increase; compare route and mode options; and investigate routes where predicted demand or cost is unusually high. Predictions should be combined with business rules and an optimization model when capacity or delivery requirements are limited.
+
+The results connect directly to the project's KPIs. Better demand forecasts support order fulfillment and inventory turnover. Mode and route decisions can reduce transportation cost and average delivery time. Delay predictions can help protect the on-time delivery rate by prioritizing risky shipments. Actual KPI results should be monitored after implementation so that the model can be retrained when conditions change.
+
 ### Sources
 
 1. U.S. Department of Transportation, Bureau of Transportation Statistics, [Freight Analysis Framework](https://www.bts.gov/faf).
