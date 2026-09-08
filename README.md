@@ -1,5 +1,7 @@
 # Logistics Data Science Project
 
+Complete project report: [REPORT.md](REPORT.md)
+
 ## Reference dataset: 2022 Commodity Flow Survey
 
 ### 1. Dataset identification
